@@ -31,7 +31,9 @@ protected:
     void setInterruptedWakeupMode(uint8_t wakeupPin = 3);
 
     virtual void initExtFlash();
+    virtual void sleepExtFlash();
     virtual void initRadio() = 0;
+    virtual void initAdcReference();
     virtual void initBatteryADC();
 
     virtual void work();
@@ -65,4 +67,5 @@ private:
 
     RFM69_ATC radio_;
     SPIFlash flash_ = SPIFlash(FLASH_SS, 0xEF30);
+    bool isFlashInitialized = false;
 };

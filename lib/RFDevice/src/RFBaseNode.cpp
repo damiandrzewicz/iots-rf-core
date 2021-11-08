@@ -1,6 +1,7 @@
-#include "RFExampleNode.h"
+#include "RFBaseNode.h"
+#include <Wire.h>
 
-void RFExampleNode::initRadio()
+void RFBaseNode::initRadio()
 {
     auto nodeID = buildNodeUniqueIdByte();
     auto networkID = 101;

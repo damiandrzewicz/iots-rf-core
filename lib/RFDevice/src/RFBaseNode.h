@@ -2,10 +2,10 @@
 
 #include "RFTemplateNode.h"
 
-class RFExampleNode : public RFTemplateNode
+class RFBaseNode : public RFTemplateNode
 {
 public:
-    RFExampleNode() = default;
+    RFBaseNode() = default;
 
 protected:
     void initRadio() override;

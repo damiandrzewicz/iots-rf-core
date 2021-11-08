@@ -9,9 +9,9 @@
 #include "uptime.h"
 
 #include "DebugLogger.h"
-#include "RFExampleNode.h"
+#include "RFBaseNode.h"
 
-RFExampleNode node;
+RFBaseNode node;
 
 
 void setup() 

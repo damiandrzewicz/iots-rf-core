@@ -8,6 +8,8 @@ void RFTemplateNode::setup()
 {
     initExtFlash();
     initRadio();
+    sleepExtFlash();
+    initAdcReference();
     initBatteryADC();
     
     PRINTLND1F("basic setup done!");
@@ -58,7 +60,7 @@ void RFTemplateNode::work()
 
 void RFTemplateNode::sendRadioBuffer()
 {
-    PRINTD1F("--->air_out: [");PRINTLND1F(sendBuffer_);PRINTLND1F("]");
+    PRINTD1F("--->air_out: [");PRINTD1(sendBuffer_);PRINTLND1F("]");
 
     if(radio_.sendWithRetry(gatewayId_, sendBuffer_, strlen(sendBuffer_)))
     {
@@ -92,10 +94,10 @@ void RFTemplateNode::setGatewayId(uint8_t gatewayId)
 }
 
 
-void RFTemplateNode::setPeriodicalWakeupMode(uint32_t periodicalDelay_)
+void RFTemplateNode::setPeriodicalWakeupMode(uint32_t delay)
 {
     mode_ = WakeupMode::Periodical;
-    periodicalDelay_ = periodicalDelay_;
+    periodicalDelay_ = delay;
 }
 
 void RFTemplateNode::setInterruptedWakeupMode(uint8_t interruptWakeupPin)
@@ -109,15 +111,28 @@ void RFTemplateNode::initExtFlash()
   // Initialize connected flash
   if (flash_.initialize()){
     PRINTLND1F("SPI Flash Init OK. Unique MAC = [");
+    isFlashInitialized = true;
   }
   else{
     PRINTLND1F("SPI Flash MEM not found (is chip soldered?)...");
   }
 }
 
-void RFTemplateNode::initBatteryADC()
+void RFTemplateNode::sleepExtFlash()
+{
+    if (isFlashInitialized)
+    {
+        flash_.sleep();
+    }
+}
+
+void RFTemplateNode::initAdcReference()
 {
     analogReference(INTERNAL);
+}
+
+void RFTemplateNode::initBatteryADC()
+{
     pinMode(batteryADC_pin, INPUT);
 }
 
@@ -166,7 +181,7 @@ void RFTemplateNode::appendSendBufferFloat(double value, bool lastItem)
 
 void RFTemplateNode::appendSendBufferDelimeter()
 {
-    strcat(sendBuffer_, ";");
+    strcat(sendBuffer_, "|");
 }
 
 uint16_t RFTemplateNode::getBatteryADC()
