@@ -1,6 +1,18 @@
 #include "RFBaseNode.h"
 #include <Wire.h>
 
+void RFBaseNode::setup()
+{
+    setPeriodicalWakeupMode(2000U);
+    RFTemplateNode::setup();
+}
+
+void RFBaseNode::work()
+{
+    readBattery();
+    sendRadioBuffer();
+}
+
 void RFBaseNode::initRadio()
 {
     auto nodeID = buildNodeUniqueIdByte();

@@ -15,6 +15,14 @@ class RFTemplateNode
 public:
     RFTemplateNode();
 
+    struct BatteryState{
+        unsigned int mV_act = 0;
+        unsigned int mV_0prc = 1850;
+        unsigned int mV_100prc = 2950;
+
+        uint8_t computePercent();
+    };
+
     enum class WakeupMode{
         Periodical,
         Interrupt
@@ -23,20 +31,19 @@ public:
     virtual void setup();
     virtual void loop();
 
+    static bool IsInterrupt;
+
 protected:
     RFM69_ATC &getRadio();
-
     void setGatewayId(uint8_t gatewayId);
     void setPeriodicalWakeupMode(uint32_t delay = 10000U);
-    void setInterruptedWakeupMode(uint8_t wakeupPin = 3);
+    void setInterruptedWakeupMode(uint8_t wakeupPin = 3, uint8_t mode = LOW);
 
     virtual void initExtFlash();
     virtual void sleepExtFlash();
     virtual void initRadio() = 0;
-    virtual void initAdcReference();
-    virtual void initBatteryADC();
 
-    virtual void work();
+    virtual void work() = 0;
 
     virtual void sendRadioBuffer();
     virtual void checkRadioBuffer();
@@ -47,10 +54,13 @@ protected:
     virtual void appendSendBufferInt(int value, bool lastItem = false);
     virtual void appendSendBufferFloat(double value, bool lastItem = false);
     virtual void appendSendBufferDelimeter();
-    virtual uint16_t getBatteryADC();
-    virtual uint8_t getBtteryPercent();
-    
 
+    BatteryState &getBatteryState();
+    virtual unsigned int readVin();
+    virtual void readBattery();
+    virtual void clearSendBuffer();
+    virtual void increaseCycleCounter();
+    
 private:
     WakeupMode mode_ = WakeupMode::Periodical;   // Default
     unsigned long cycle_ = 0;
@@ -60,12 +70,14 @@ private:
 
     uint8_t gatewayId_ = 1;
 
-
-    uint8_t batteryADC_pin = A0;
     uint32_t periodicalDelay_ = 10000U;
+
     uint8_t interruptWakeup_pin_ = 3;
+    uint8_t interruptMode_ = LOW;
 
     RFM69_ATC radio_;
     SPIFlash flash_ = SPIFlash(FLASH_SS, 0xEF30);
     bool isFlashInitialized = false;
+    
+    BatteryState batteryState_;
 };

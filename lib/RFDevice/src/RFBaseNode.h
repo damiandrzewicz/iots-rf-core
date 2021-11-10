@@ -7,6 +7,9 @@ class RFBaseNode : public RFTemplateNode
 public:
     RFBaseNode() = default;
 
+    virtual void setup() override;
+
 protected:
-    void initRadio() override;
+    virtual void work() override;
+    virtual void initRadio() override;
 };
