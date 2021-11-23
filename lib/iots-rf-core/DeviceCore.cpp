@@ -1,6 +1,7 @@
 #include "DeviceCore.h"
 #include "BaseFrame.h"
 #include "NodeRegisterFrame.h"
+#include "NodeAliveFrame.h"
 
 bool DeviceCore::IsExtInterrupt = false;
 
@@ -136,11 +137,10 @@ bool DeviceCore::registerNode()
     // Reset radio ID to default one
     initRadio(radioConfig_.getUnregisteredNodeId());
 
-    bool registered = false;
     uint8_t attempts = 1;
     
     NodeRegisterFrame nodeRegisterFrame;
-    while(!registered){
+    while(!nodeRegistered_){
         // Every 10th attempt sleep for 1 minute, for 30 seconds try to send message every 3 seconds
         long nDelay = attempts++ % 10 == 0 ? 60000U : 3000U;
 
@@ -148,7 +148,7 @@ bool DeviceCore::registerNode()
         NodeRegisterRequest nodeRegisterRequest;
         strncpy(nodeRegisterRequest.uuid, uuidConfig_.data().uuid, sizeof(nodeRegisterRequest.uuid));
         nodeRegisterRequest.deviceClass = deviceClass_;
-        nodeRegisterRequest.sleepTime = sleepTime_;
+        nodeRegisterRequest.sleepTime = informNodeAlivePeriodSec_  + 1;
 
         nodeRegisterFrame.build(buffer_, nodeRegisterRequest);
 
@@ -162,14 +162,10 @@ bool DeviceCore::registerNode()
         // Check if received response
         if(buffer_.size())
         {
-            BaseFrameData baseFrameData;
-            BaseFrame baseFrame;
-            if(!baseFrame.parse(buffer_, baseFrameData)){
-                PRINTLND1F("BaseFrameData parse err");
+            if(!verifyBaseFrame(ActionType::Register, ActionDirection::Response)){
                 deepSleepDelay(nDelay);
                 continue;
             }
-
 
             NodeRegisterResponse nodeRegisterResponse;
             if(!nodeRegisterFrame.parse(nodeRegisterResponse, buffer_)){
@@ -178,13 +174,15 @@ bool DeviceCore::registerNode()
                 continue;
             }
 
+            if(nodeRegisterResponse.state == ActionState::Error){
+                PRINTLND1F("register error!"); 
+                deepSleepDelay(nDelay);
+                continue;
+            }
+
             PRINTD1F("new nodeId:"); PRINTLND1(nodeRegisterResponse.nodeId);
             initRadio(nodeRegisterResponse.nodeId);   // Initialize radio with ID from id's pull
-            registered = true;
-
-            
-            buffer_.appendText("testData!!!", true);
-            sendBufferToRadio(false);
+            nodeRegistered_ = true;
         }
         else{
             deepSleepDelay(nDelay);
@@ -198,7 +196,40 @@ bool DeviceCore::registerNode()
 
 bool DeviceCore::informNodeAlive()
 {
-    return false;
+    batteryState_.read();
+    NodeAliveRequest request;
+    request.batteryPercent = batteryState_.computePercent();
+
+    NodeAliveFrame nodeAliveFrame;
+    if(!nodeAliveFrame.build(buffer_, request)){
+        PRINTLND1F("NodeAliveRequest build err");
+        return false;
+    }
+
+    if(!sendBufferToRadio(true)){
+        return false;
+    }
+
+        // Check if received response
+    if(buffer_.size())
+    {
+        if(!verifyBaseFrame(ActionType::Alive, ActionDirection::Response)){
+            return;
+        }
+
+        NodeAliveResponse response;
+        if(!nodeAliveFrame.parse(response, buffer_)){
+            PRINTLND1F("NodeAliveResponse parse err");
+            return;
+        }
+
+        if(response.state == ActionState::Error){
+            PRINTLND1F("register error!"); 
+            return;
+        }
+    }
+
+    return true;
 }
 
 bool DeviceCore::getCommand()
@@ -300,6 +331,16 @@ bool DeviceCore::loadRadioDataToBuffer()
     {
         return true;
     }
+}
+
+void DeviceCore::setInformNodeAlivePeriodSec(uint16_t period)
+{
+    informNodeAlivePeriodSec_ = period;
+}
+
+uint16_t DeviceCore::getInformNodeAlivePeriodSec()
+{
+    return informNodeAlivePeriodSec_;
 }
 
 // void DeviceCore::initRadio()
@@ -435,12 +476,7 @@ void DeviceCore::deepSleepDelay(unsigned int delay)
     Serial.flush();
     radio_.sleep();
 
-    if(!delay){
-        LowPowerWrp.DeepSleep(sleepTime_ * 1000);
-    }
-    else{
-        LowPowerWrp.DeepSleep(delay);
-    }
+    LowPowerWrp.DeepSleep(delay);
 }
 
 void wakeUp()
@@ -458,6 +494,22 @@ void DeviceCore::deepSleepForewerAndWakeInt(uint8_t pin_, uint8_t mode)
     detachInterrupt(0); 
 }
 
+bool DeviceCore::verifyBaseFrame(ActionType actionType, ActionDirection actionDirection)
+{
+    BaseFrameData baseFrameData;
+    BaseFrame baseFrame;
+    if(!baseFrame.parse(buffer_, baseFrameData)){
+        PRINTLND1F("BaseFrameData parse err");
+        return false;
+    }
+
+    if(baseFrameData.actionType != actionType || baseFrameData.actionDirection != actionDirection){
+        PRINTLND1F("BaseFrameData not passed!");
+        return false;
+    }
+
+    return true;
+}
 
 
 // void DeviceCore::appendSendBufferFloat(double value, uint8_t prec)

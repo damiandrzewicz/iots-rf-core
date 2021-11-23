@@ -9,7 +9,7 @@ struct NodeRegisterRequest{
     uint16_t sleepTime;
 };
 
-struct NodeRegisterResponse{
+struct NodeRegisterResponse : NodeResponse{
     uint8_t nodeId;
 };
 
@@ -30,7 +30,10 @@ public:
         buff.clear();
         buff.appendInt(static_cast<int>(ActionType::Register));
         buff.appendInt(static_cast<int>(ActionDirection::Response));
-        buff.appendInt(response.nodeId, true);
+        buff.appendInt(static_cast<int>(response.error));
+        if(response.error == ActionError::Ok){
+            buff.appendInt(response.nodeId, true);
+        }
         return true;
     }
 
@@ -48,11 +51,15 @@ public:
     }
 
     virtual bool parse(NodeRegisterResponse &response, Buffer &buff) override{
-        int nodeId;
-        if( 1 != sscanf(buff.data(), "%*d|%*d|%d", &nodeId)){
-            return false;
-        }
-        response.nodeId = nodeId;
+        char *data = buff.data();
+        auto ret = fillResponseWithActionError(data, response);
+        if(ret == -1){return false;}
+        else if(ret){return true;}
+
+        // Get rest of arguments, no error
+        char *sNodeId = strtok(NULL, ActionDelim);
+        if(!sNodeId){return false;}
+        response.nodeId = atoi(sNodeId);
         return true;
     }
 

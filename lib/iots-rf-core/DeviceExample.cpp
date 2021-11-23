@@ -9,7 +9,8 @@ DeviceExample::DeviceExample()
 void DeviceExample::loop()
 {
     Serial.println("lp");
-    deepSleepDelay();
+    informNodeAlive();
+    deepSleepDelay(getInformNodeAlivePeriodSec() * 1000);
 }
 
 bool DeviceExample::sendState()

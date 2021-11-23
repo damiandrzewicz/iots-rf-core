@@ -49,10 +49,13 @@ protected:
     bool ackCheck(bool rc);
     bool loadRadioDataToBuffer();
 
-
+    void setInformNodeAlivePeriodSec(uint16_t period);
+    uint16_t getInformNodeAlivePeriodSec();
     
     void deepSleepDelay(unsigned int delay = 0);
     void deepSleepForewerAndWakeInt(uint8_t pin_, uint8_t mode);
+
+    bool verifyBaseFrame(ActionType actionType, ActionDirection actionDirection);
     
 protected:
     DeviceClass deviceClass_;
@@ -63,5 +66,6 @@ protected:
     SPIFlash flash_ = SPIFlash(FLASH_SS, 0xEF30);
     BatteryState batteryState_;
     Buffer buffer_;
-    uint16_t sleepTime_ = 15;
+    uint16_t informNodeAlivePeriodSec_ = 15;
+    bool nodeRegistered_ = false;
 };
