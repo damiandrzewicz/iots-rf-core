@@ -1,10 +1,11 @@
 #include <Arduino.h>
-#include "RFBaseNode.h"
+#include "DeviceExample.h"
 
-RFBaseNode node;
+DeviceExample node;
 
 void setup() 
 {     
+  Debug = 1;
   Serial.begin(38400);
   node.setup();
 }
