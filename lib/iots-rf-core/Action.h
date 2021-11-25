@@ -9,9 +9,8 @@ enum class ActionType{
     State = 3,
 
     // System Actions
-    NodeIdentifierConfig = 100,
-    RadioConfig = 101,
-    DeviceConfig = 102
+    SetDeviceConfig = 100,
+    GetDeviceConfig = 101,
 
 };
 

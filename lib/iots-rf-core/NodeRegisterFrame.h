@@ -30,23 +30,31 @@ public:
         buff.clear();
         buff.appendInt(static_cast<int>(ActionType::Register));
         buff.appendInt(static_cast<int>(ActionDirection::Response));
-        buff.appendInt(static_cast<int>(response.error));
-        if(response.error == ActionError::Ok){
+
+        bool isError = response.error != ActionError::Ok;
+        buff.appendInt(static_cast<int>(response.error), isError);
+        
+        if(!isError){
             buff.appendInt(response.nodeId, true);
         }
         return true;
     }
 
     virtual bool parse(NodeRegisterRequest &request, Buffer &buff) override{
-        int deviceClass;
-        int sleepTime;
-        
-        if( 3 != sscanf(buff.data(), "%*d|%*d|%6s|%d|%d", request.uuid, &deviceClass, &sleepTime)){
+        char *data = buff.data();
+        parseIgnoreBaseFrame(data);
+
+        char *uuid = strtok(NULL, ActionDelim);
+        char *deviceClass = strtok(NULL, ActionDelim);
+        char *sleepTime = strtok(NULL, ActionDelim);
+
+        if(!uuid || !deviceClass || !sleepTime){
             return false;
         }
 
-        request.deviceClass = static_cast<DeviceClass>(deviceClass);
-        request.sleepTime = sleepTime;
+        strncpy(request.uuid, uuid, sizeof(request.uuid));
+        request.deviceClass = static_cast<DeviceClass>(atoi(deviceClass));
+        request.sleepTime = atoi(sleepTime);
         return true;
     }
 
@@ -62,7 +70,6 @@ public:
         response.nodeId = atoi(sNodeId);
         return true;
     }
-
 
 private:
 };

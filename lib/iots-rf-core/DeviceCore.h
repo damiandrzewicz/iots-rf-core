@@ -11,8 +11,7 @@
 #include "LowPowerWrapper.h"
 #include "BatteryState.h"
 #include "Buffer.h"
-#include "Error.h"
-
+#include "Action.h"
 
 #define LED_PIN 9
 #define FLASH_SS 8
@@ -23,14 +22,13 @@ public:
     DeviceCore(DeviceClass deviceClass);
 
     virtual void setup();
-    virtual void loop() = 0;
+    virtual void loop();
 
     static bool IsExtInterrupt;
 
 protected:
     // Configuration
     void readConfiguration(unsigned int delay = 10000U);
-    void sendConfigError(Error err);
 
     // Initialization
     void initExtFlash();

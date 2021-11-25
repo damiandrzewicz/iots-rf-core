@@ -2,6 +2,8 @@
 #include "BaseFrame.h"
 #include "NodeRegisterFrame.h"
 #include "NodeAliveFrame.h"
+#include "SetDeviceConfigFrame.h"
+#include "GetDeviceConfigFrame.h"
 
 bool DeviceCore::IsExtInterrupt = false;
 
@@ -14,9 +16,13 @@ void DeviceCore::setup()
 {
     readConfiguration();
     initExtFlash();
-    registerNode();
     
     PRINTD1F("DC setup ok!");
+}
+
+void DeviceCore::loop()
+{
+    registerNode();
 }
 
 void DeviceCore::readConfiguration(unsigned int delay)
@@ -30,10 +36,59 @@ void DeviceCore::readConfiguration(unsigned int delay)
     uint16_t period = 15000U;
     unsigned long time_now = millis();
 
-    // DataFrameParser dfp;
-    // while(waitUntilUUID || (millis() < time_now + period))
-    // {
-    //     if(loadBufferFromSerial()){
+    BaseFrame baseFrame;
+    while(waitUntilUUID || (millis() < time_now + period))
+    {
+         if(loadBufferFromSerial()){
+            BaseFrameData bfd;
+            if(!baseFrame.parse(buffer_, bfd)){
+                continue;
+            }
+
+            if(bfd.actionDirection == ActionDirection::Request){
+
+            }
+
+            if(bfd.actionType == ActionType::GetDeviceConfig){
+                GetDeviceConfigFrame devCfFr;
+                GetDeviceConfigResponse response;
+                response.uuid = uuidConfig_.data().uuid;
+                response.networkId = radioConfig_.data().networkId;
+                response.gatewayId = radioConfig_.data().gatewayId;
+                response.encryptKey = radioConfig_.data().encryptKey;
+                response.powerLevel = radioConfig_.data().powerLevel;
+                response.customFrequency = radioConfig_.data().customFrequency;
+                response.error = ActionError::Ok;
+
+                devCfFr.build(buffer_, response);
+
+                sendBufferToSerial();
+            }
+            else if(bfd.actionType == ActionType::SetDeviceConfig){
+                SetDeviceConfigFrame devCfFr;
+                SetDeviceConfigRequest request;
+                SetDeviceConfigResponse response;
+
+                if(!devCfFr.parse(request, buffer_)){
+                    response.error = ActionError::ParseFrameError;
+                }
+                else{
+                    strncpy(uuidConfig_.data().uuid, request.uuid, sizeof(uuidConfig_.data().uuid));
+                    radioConfig_.data().networkId = request.networkId;
+                    radioConfig_.data().gatewayId = request.gatewayId;
+                    strncpy(radioConfig_.data().encryptKey, request.encryptKey, sizeof(radioConfig_.data().encryptKey));
+                    radioConfig_.data().powerLevel = request.powerLevel;
+                    radioConfig_.data().customFrequency = request.customFrequency;
+
+                    uuidConfig_.save();
+                    radioConfig_.save();
+
+                    response.error = ActionError::Ok;
+                }
+
+                devCfFr.build(buffer_, response);
+                sendBufferToSerial();
+            }
     //         Action action = dfp.parseAction(buffer_);
     //         if(action == Action::ResetToDefault){
     //             radioConfig_.clear();
@@ -74,17 +129,12 @@ void DeviceCore::readConfiguration(unsigned int delay)
     //         else if(action == Action::Unsupported){
     //             sendConfigError(Error::ActionUnsupported);
     //         }
-    //     }
+         }
 
-        //waitUntilUUID = uuidConfig_.data().isEmpty();
-    //}
+        waitUntilUUID = uuidConfig_.data().isEmpty();
+    }
 
     Serial.print(F("config done!"));
-}
-
-void DeviceCore::sendConfigError(Error err)
-{
-    Serial.print(F("ERR:"));Serial.println(static_cast<int>(err));
 }
 
 void DeviceCore::initExtFlash()
@@ -133,6 +183,10 @@ void DeviceCore::initRadio(uint8_t nodeId)
 // Messages
 bool DeviceCore::registerNode()
 {
+    if(nodeRegistered_){
+        return true;    // Nothing to do here
+    }
+
     PRINTLND1F("registerNode start");
     // Reset radio ID to default one
     initRadio(radioConfig_.getUnregisteredNodeId());
@@ -142,7 +196,7 @@ bool DeviceCore::registerNode()
     NodeRegisterFrame nodeRegisterFrame;
     while(!nodeRegistered_){
         // Every 10th attempt sleep for 1 minute, for 30 seconds try to send message every 3 seconds
-        long nDelay = attempts++ % 10 == 0 ? 60000U : 3000U;
+        long nDelay = attempts++ % 3 == 0 ? 60000U : 5000U;
 
         PRINTLND1F("loop");
         NodeRegisterRequest nodeRegisterRequest;
@@ -153,8 +207,6 @@ bool DeviceCore::registerNode()
         nodeRegisterFrame.build(buffer_, nodeRegisterRequest);
 
         if(!sendBufferToRadio(true)){
-            
-            //delay(3000U);
             deepSleepDelay(nDelay);
             continue;
         }
@@ -174,7 +226,7 @@ bool DeviceCore::registerNode()
                 continue;
             }
 
-            if(nodeRegisterResponse.state == ActionState::Error){
+            if(nodeRegisterResponse.error != ActionError::Ok){
                 PRINTLND1F("register error!"); 
                 deepSleepDelay(nDelay);
                 continue;
@@ -210,22 +262,23 @@ bool DeviceCore::informNodeAlive()
         return false;
     }
 
-        // Check if received response
+    // Check if received response
     if(buffer_.size())
     {
         if(!verifyBaseFrame(ActionType::Alive, ActionDirection::Response)){
-            return;
+            return false;
         }
 
         NodeAliveResponse response;
         if(!nodeAliveFrame.parse(response, buffer_)){
             PRINTLND1F("NodeAliveResponse parse err");
-            return;
+            return false;
         }
 
-        if(response.state == ActionState::Error){
-            PRINTLND1F("register error!"); 
-            return;
+        if(response.error != ActionError::Ok){
+            PRINTLND1F("not registered!");
+            nodeRegistered_ = false; 
+            return false;
         }
     }
 

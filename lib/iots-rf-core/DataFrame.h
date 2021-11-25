@@ -21,12 +21,13 @@ protected:
     virtual bool parseIgnoreBaseFrame(char *data){
         strtok(data, ActionDelim);  // Ignore ActionType
         strtok(NULL, ActionDelim);  // Ignore ActionDirection
+        return true;
     }
 
     virtual bool parseResponseActionError(ActionError *actionError){
         char *sActionError = strtok(NULL, ActionDelim);
         if(!sActionError){return false;}
-        *sActionError = static_cast<ActionError>(atoi(sActionError));
+        *actionError = static_cast<ActionError>(atoi(sActionError));
         return true;
     }
 
